@@ -6,9 +6,10 @@
 # packages
 library(tidyverse)
 library(openxlsx)
+library(sf)
 
 # Source cleaning functions
-source('cleaning_functions.R')
+# source('cleaning_functions.R')
 
 # # Find files in data folder.
 # all_files = list.files(path = 'data/', pattern = '[^R]$',full.names = T)
@@ -149,117 +150,33 @@ rskm_dat = rskm_dat |>
          !is.na(lon)) 
 
 rskm_dat = rskm_dat |> 
-  distinct()
+  distinct() |> 
+  filter(!duplicated(id))
 
-# rskm_sf = sf::st_as_sf(
-#   rskm_dat,
-#   coords = c("lon","lat"),
-#   crs = 4326
-# )
+# Simplify the levels for 'trap_type'
+rskm_dat = rskm_dat |> 
+  mutate(trap_type = str_extract(trap_type, '[ a-zA-Z]*')) |>
+  mutate(trap_type = stringr::str_squish(trap_type)) |> 
+  mutate(trap_type = str_to_title(trap_type)) |> 
+  mutate(trap_type = str_replace_all(trap_type, 'Traps','Trap')) |> 
+  mutate(trap_type = str_replace_all(trap_type, 'Hand.*', 'Hand Collected'))
 
+# Remove some seemingly superfluous 
+# levels of taxonomic information.
+rskm_dat = rskm_dat |> 
+  dplyr::select(-phylum,-class)
 
-qs::qsave(rskm_dat, file = 'www/bee_db.qs')
+# Attempting to reduce the number of overlapping, duplicated
+# coordinates. Two ideas:
+# 1. Spatial match with some polygons to make choropleth. (too intense for shiny app RAM?)
+#    After some quick testing, it seems this may be too intense RAM-wise.
 
-# rskm_dat = qs::qread('www/bee_db.qs')
+# 2. Summarize number of samples of given ID for each coordinate.
 
-# rskm_dat |> 
-#   group_by(lat, lon) |> 
-#   summarise()
-# dat1 = all_content[[1]] |> 
-#   reframe(
-#     data_type = 'field',
-#     id = jar, 
-#     id_type = 'jar',
-#     trap_type = 'jar?',
-#     start_date = openxlsx::convertToDate(date_set),
-#     end_date = openxlsx::convertToDate(date_stop),
-#     days_out,
-#     lat = as.numeric(latitude), 
-#     lon = as.numeric(longitude),
-#     loc_notes = location,
-#     comments)
-# 
-# dat2 = all_content[[2]] |> 
-#   reframe(
-#     data_type = 'id',
-#     id = paste0(catalogue_number, number),
-#     id_type = 'rskm',
-#     trap_type = trap_type,
-#     sex,
-#     start_date = lubridate::ymd(paste0(start_year,'-',start_month,'-',start_day)),
-#     end_date = lubridate::ymd(paste0(end_year,'-',end_month,'-',end_day)),
-#     lat = decimal_latitude,
-#     lon = decimal_longitude,
-#     loc_notes = locality,
-#     comments
-#   ) 
-# 
-# # # Skip:
-# # all_content[[3]]
-# # all_content[[4]]
-# dat3 = all_content[[5]] |> 
-#   mutate(
-#     end_day = coalesce(as.double(end_day_leave_blank_if_this_was_a_one_day_sample), as.double(start_day)),
-#     end_month = coalesce(as.character(end_month_leave_blank_if_this_was_a_one_day_sample), as.character(start_month))) |> 
-# reframe(
-#     data_type = 'field',
-#     id = sample,
-#     id_type = sample_description,
-#     trap_type = collection_method_bumble_bee_plot_bumble_bee_route_wandering_pan_traps,
-#     start_date = lubridate::ymd(paste0(year,'-',start_month,'-',start_day)),
-#     end_date = lubridate::ymd(paste0(year,'-',end_month,'-',end_day)),
-#     lat = latitude_n,
-#     lon = longitude_w,
-#     loc_notes = locality_description_name_of_regional_park_road_rest_stop_etc_separate_multiple_entries_with_semi_colon
-#           )
-# 
-# dat4 = all_content[[6]] |> 
-#   mutate(
-#     end_day = coalesce(as.double(end_day_leave_blank_if_this_was_a_one_day_sample), as.double(start_day)),
-#     end_month = coalesce(as.character(end_month_leave_blank_if_this_was_a_one_day_sample), as.character(start_month))) |> 
-#   reframe(
-#     data_type = 'field',
-#     id = sample,
-#     id_type = sample_description,
-#     trap_type = collection_method_bumble_bee_plot_bumble_bee_route_wandering_pan_traps,
-#     start_date = lubridate::ymd(paste0(year,'-',start_month,'-',start_day)),
-#     end_date = lubridate::ymd(paste0(year,'-',end_month,'-',end_day)),
-#     lat = latitude_n,
-#     lon = longitude_w,
-#     loc_notes = locality_description_name_of_regional_park_road_rest_stop_etc_separate_multiple_entries_with_semi_colon
-#   )
-# 
-# dat5 = all_content[[7]] |> 
-#   # mutate(
-#   # end_day = coalesce(as.double(end_day_leave_blank_if_this_was_a_one_day_sample), as.double(start_day)),
-#   # end_month = coalesce(as.character(end_month_leave_blank_if_this_was_a_one_day_sample), as.character(start_month))) |> 
-#   reframe(
-#     data_type = 'field',
-#     id = sample,
-#     id_type = sample_type,
-#     trap_type = method,
-#     start_date = lubridate::ymd(paste0(year,'-',start_month,'-',start_day)),
-#     end_date = lubridate::ymd(paste0(year,'-',end_month,'-',end_day)),
-#     lat = latitude_n,
-#     lon = longitude_w,
-#     loc_notes = paste0(locality_1,', ',locality_2,', ', locality_3),
-#     comments = paste0(method,'; ',habitat)
-#   )
-# 
-# dat6 = all_content[[8]] |> 
-#   reframe(
-#     data_type = 'id',
-#     id = stringr::str_extract(num_cat_no_part_3, '[0-9]+'),
-#     id_type = 'rskm',
-#     trap_type = loc_collection_method,
-#     start_date = openxlsx::convertToDate(loc_date_collected_from),
-#     end_date = openxlsx::convertToDate(loc_date_collected_to),
-#     lat = loc_latitude,
-#     lon = loc_longitude,
-#     loc_notes = loc_locality_notes
-#   )
-# 
-# all_content[[9]] |> 
-#   reframe(
-#     data_type = 
-#   )
+rskm_sum = rskm_dat |> 
+  dplyr::select(lat,lon,trap_type,start_date,end_date,order:scientific_name) |> 
+  group_by_all() |> 
+  count() |> 
+  ungroup()
+
+qs::qsave(rskm_sum, file = 'www/bee_db.qs')
