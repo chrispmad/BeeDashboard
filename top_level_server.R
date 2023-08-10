@@ -5,6 +5,7 @@ library(leaflet)
 library(dplyr)
 library(tidyr)
 library(magick)
+library(sf)
 
 source('R/mod_combine_datasheets.R')
 source('R/mod_combine_datasheets_utils_digest_excel.R')
@@ -98,19 +99,43 @@ server <- function(input, output, session) {
     )
   })
   
+  order_s = reactive({input$order_sel})
+  
   output$genus_sel_ui = renderUI({
+    
     if(input$all_records) return(NULL)
+
+    if(!is.null(order_s())){
+      genus_options = na.omit(unique(dat[dat$order %in% order_s(),]$genus))
+    } else {
+      genus_options = na.omit(unique(dat$genus))
+    }
+    
     selectInput('genus_sel','Genus',
-                choices = na.omit(unique(dat$genus)),
+                choices = genus_options,
                 selected = NULL,
                 multiple = T
     )
   })
   
+  genus_s = reactive({input$genus_sel})
+  
   output$species_sel_ui = renderUI({
+    
     if(input$all_records) return(NULL)
+    
+    if(!is.null(order_s())){
+      if(!is.null(genus_s())){
+        species_options = na.omit(dat[dat$order %in% order_s() & dat$genus %in% genus_s(),]$scientific_name)
+      } else {
+        species_options = na.omit(dat[dat$order %in% order_s(),]$scientific_name)
+      }
+    } else {
+      species_options = na.omit(unique(dat$scientific_name))
+    }
+    
     selectInput('species_sel','Species',
-                choices = na.omit(unique(dat$scientific_name)),
+                choices = species_options,
                 selected = NULL,
                 multiple = T
     )
@@ -153,6 +178,7 @@ server <- function(input, output, session) {
   
   # What is the most specific ID we have for each row?
   best_id = reactive({
+    req(nrow(dat_f()) > 0)
     dat_f() |> 
       mutate(best_id = data.table::fcase(
         !(is.na(scientific_name) & is.na(genus)), paste0(genus,' ',scientific_name),
