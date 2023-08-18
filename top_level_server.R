@@ -14,20 +14,21 @@ source('R/utils.R')
 # UI Variables
 sidebar_width = '250px'
 
-# Javascript
-jscode <-
-  '
-  $(document).on("shiny:connected", function(e) {
-  var slideshow_card = $(".slick-list .draggable")
-  $("#bee_slideshow_card").css("height", (slideshow_card.height + "px");
-});
-'
+# # Javascript
+# jscode <-
+#   '
+#   $(document).on("shiny:connected", function(e) {
+#   var slideshow_card = $(".slick-list .draggable")
+#   $("#bee_slideshow_card").css("height", (slideshow_card.height + "px");
+# });
+# '
 
 ui <- bslib::page_navbar(
-  tags$script(jscode),
+  # tags$script(jscode),
+  shinyjs::useShinyjs(),
   title = 'Bee Dashboard',
   sidebar = bslib::sidebar(
-    title = 'Sidebar',
+    title = 'Dashboard Controls',
     width = sidebar_width,
     # uiOutput('bee_slideshow_ui'),
     # bslib::card(
@@ -52,15 +53,13 @@ ui <- bslib::page_navbar(
     uiOutput('class_sel_ui'),
     uiOutput('order_sel_ui'),
     uiOutput('genus_sel_ui'),
-    uiOutput('species_sel_ui'),
-    uiOutput('list_of_filters')
+    uiOutput('species_sel_ui')
   ),
   bslib::navset_tab(
     bslib::nav_panel(
       title = 'Bee Map',
       leafletOutput('my_map',
-                    height = '600px'),
-      DT::DTOutput('bee_table')
+                    height = '600px')
     ),
     bslib::nav_panel(
       title =  'Excel Sheet Combiner',
@@ -92,7 +91,8 @@ server <- function(input, output, session) {
   
   output$order_sel_ui = renderUI({
     if(input$all_records) return(NULL)
-    selectInput('order_sel','Order',
+    selectInput('order_sel',
+                h6('Order'),
                 choices = na.omit(unique(dat$order)),
                 selected = NULL,
                 multiple = T
@@ -101,18 +101,28 @@ server <- function(input, output, session) {
   
   order_s = reactive({input$order_sel})
   
-  output$genus_sel_ui = renderUI({
-    
-    if(input$all_records) return(NULL)
-
+  genus_options = reactive({
+    # No genus options for the selected order? Return just one NA
     if(!is.null(order_s())){
       genus_options = na.omit(unique(dat[dat$order %in% order_s(),]$genus))
     } else {
       genus_options = na.omit(unique(dat$genus))
     }
+    return(genus_options)
+  })
+  
+  output$genus_sel_ui = renderUI({
     
-    selectInput('genus_sel','Genus',
-                choices = genus_options,
+    if(input$all_records) return(NULL)
+
+    # No genus options for a selected order? Make text grey.
+    the_style = ifelse(length(genus_options())==0,'color:#C4CAE0;text-decoration:line-through;','color:black')
+    
+    selectInput('genus_sel',
+                h6(
+                  'Genus', 
+                  style = the_style),
+                choices = genus_options(),
                 selected = NULL,
                 multiple = T
     )
@@ -120,10 +130,7 @@ server <- function(input, output, session) {
   
   genus_s = reactive({input$genus_sel})
   
-  output$species_sel_ui = renderUI({
-    
-    if(input$all_records) return(NULL)
-    
+  species_options = reactive({
     if(!is.null(order_s())){
       if(!is.null(genus_s())){
         species_options = na.omit(dat[dat$order %in% order_s() & dat$genus %in% genus_s(),]$scientific_name)
@@ -133,9 +140,20 @@ server <- function(input, output, session) {
     } else {
       species_options = na.omit(unique(dat$scientific_name))
     }
+  })
+  
+  output$species_sel_ui = renderUI({
     
-    selectInput('species_sel','Species',
-                choices = species_options,
+    if(input$all_records) return(NULL)
+    
+    the_style = ifelse(length(species_options())==0,'color:#C4CAE0;text-decoration:line-through;','color:black')
+    
+    selectInput('species_sel',
+                h6(
+                  'Species',
+                  style = the_style
+                ),
+                choices = species_options(),
                 selected = NULL,
                 multiple = T
     )
@@ -194,14 +212,14 @@ server <- function(input, output, session) {
   # Shiny module for excel combiner tab.
   mod_combine_datasheets_server('excel_combiner')
   
-  # Create bee slideshow
-  output$bee_slideshow = slickR::renderSlickR({
-    self_sizing_slickR(
-      file_pattern = '_lr.png',
-      container_width = sidebar_width,
-      autoplayspeed = 10000
-    )
-  })
+  # # Create bee slideshow
+  # output$bee_slideshow = slickR::renderSlickR({
+  #   self_sizing_slickR(
+  #     file_pattern = '_lr.png',
+  #     container_width = sidebar_width,
+  #     autoplayspeed = 10000
+  #   )
+  # })
   
   my_leaf_pal = reactive({
       leaflet::colorFactor(
@@ -251,7 +269,6 @@ server <- function(input, output, session) {
         addCircleMarkers(
           col = 'black',
           weight = 1,
-          # fillColor = 'pink',
           fillColor = my_leaf_pal()(dat_sf()[[input$pal_var]]),
           fillOpacity = 0.75,
           label = my_labels(),
@@ -263,9 +280,9 @@ server <- function(input, output, session) {
                   layerId = 'legend')
   })
   
-  output$bee_table = DT::renderDT({
-    dat_f()
-  })
+  # output$bee_table = DT::renderDT({
+  #   dat_f()
+  # })
 }
 
 shinyApp(ui, server)

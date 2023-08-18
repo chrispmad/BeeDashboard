@@ -161,6 +161,9 @@ rskm_dat = rskm_dat |>
   mutate(trap_type = str_replace_all(trap_type, 'Traps','Trap')) |> 
   mutate(trap_type = str_replace_all(trap_type, 'Hand.*', 'Hand Collected'))
 
+# Replace anything resembling 'sp.' for species ID with NA.
+rskm_dat[str_detect(rskm_dat$scientific_name,'.*sp\\..*') & !is.na(rskm_dat$scientific_name),]$scientific_name <- NA
+
 # Remove some seemingly superfluous 
 # levels of taxonomic information.
 rskm_dat = rskm_dat |> 
